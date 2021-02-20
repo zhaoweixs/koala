@@ -32,9 +32,18 @@ public class JdbcUserDetailServiceImpl implements UserDetailsService {
     private AuthorityMapper authorityMapper;
 
     @Override
-    public UserDetails loadUserByUsername(String s) throws UsernameNotFoundException {
+    public UserDetails loadUserByUsername(String username) throws UsernameNotFoundException {
         LambdaQueryWrapper<UserInfo> lambdaQueryWrapper = new LambdaQueryWrapper<>();
-        lambdaQueryWrapper.eq(UserInfo::getName,s);
+        lambdaQueryWrapper.eq(UserInfo::getName,username);
+        UserInfo userInfo = userMapper.selectOne(lambdaQueryWrapper);
+
+        List<AuthorityInfo> authorityInfoList = authorityMapper.findAuthorityByUserId(userInfo.getId());
+        return new User(userInfo.getName(),userInfo.getPassword(),userInfo.getEnabled() == 1 ? true : false,true,true,true,authorityInfoList.stream().map(o->new SimpleGrantedAuthority(o.getAuthority())).collect(Collectors.toList()));
+    }
+
+    public UserDetails loadUserByMobile(String mobile) throws UsernameNotFoundException {
+        LambdaQueryWrapper<UserInfo> lambdaQueryWrapper = new LambdaQueryWrapper<>();
+        lambdaQueryWrapper.eq(UserInfo::getMobile,mobile);
         UserInfo userInfo = userMapper.selectOne(lambdaQueryWrapper);
 
         List<AuthorityInfo> authorityInfoList = authorityMapper.findAuthorityByUserId(userInfo.getId());

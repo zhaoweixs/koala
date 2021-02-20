@@ -1,9 +1,11 @@
 package com.koala.uaa.config;
 
+import com.koala.uaa.granter.SmsCodeTokenGranter;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.data.redis.connection.RedisConnectionFactory;
+import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.core.userdetails.UserDetailsService;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -12,11 +14,17 @@ import org.springframework.security.oauth2.config.annotation.web.configuration.A
 import org.springframework.security.oauth2.config.annotation.web.configuration.EnableAuthorizationServer;
 import org.springframework.security.oauth2.config.annotation.web.configurers.AuthorizationServerEndpointsConfigurer;
 import org.springframework.security.oauth2.config.annotation.web.configurers.AuthorizationServerSecurityConfigurer;
+import org.springframework.security.oauth2.provider.CompositeTokenGranter;
+import org.springframework.security.oauth2.provider.TokenGranter;
 import org.springframework.security.oauth2.provider.client.JdbcClientDetailsService;
 import org.springframework.security.oauth2.provider.token.TokenStore;
 import org.springframework.security.oauth2.provider.token.store.redis.RedisTokenStore;
 
+import javax.annotation.Resource;
 import javax.sql.DataSource;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
 
 /**
  * ToDO
@@ -39,6 +47,9 @@ public class AuthorizationServerConfig extends AuthorizationServerConfigurerAdap
 
     @Autowired
     private RedisConnectionFactory redisConnectionFactory;
+
+    @Autowired
+    private RedisTemplate<String,Object> redisTemplate;
 
     @Bean
     public JdbcClientDetailsService jdbcClientDetailsService(){
@@ -63,33 +74,19 @@ public class AuthorizationServerConfig extends AuthorizationServerConfigurerAdap
 
     @Override
     public void configure(AuthorizationServerEndpointsConfigurer endpoints) throws Exception {
-        endpoints.authenticationManager(authenticationManager).userDetailsService(jdbcUserDetailServiceImpl).tokenStore(redisTokenStore());
+        endpoints
+                .authenticationManager(authenticationManager)
+                .userDetailsService(jdbcUserDetailServiceImpl)
+                .tokenStore(redisTokenStore())
+                .tokenGranter(tokenGranter(endpoints));
     }
 
-//    @Override
-//    public void configure(AuthorizationServerSecurityConfigurer security) throws Exception {
-//        security.tokenKeyAccess("permitAll()");  // 获取 token 的策略
-//        security.checkTokenAccess("isAuthenticated()");
-//    }
-//
-//    /**
-//     * 配置客户端信息
-//     *
-//     * @param clients
-//     * @throws Exception
-//     */
-//    @Override
-//    public void configure(ClientDetailsServiceConfigurer clients) throws Exception {
-//        clients.withClientDetails(jdbcClientDetailsService());  //设置客户端的配置从数据库中读取，存储在oauth_client_details表
-//    }
-//
-//    @Override
-//    public void configure(AuthorizationServerEndpointsConfigurer endpoints) throws Exception {
-//        endpoints.authenticationManager(authenticationManager) // 开启密码验证，来源于 WebSecurityConfigurerAdapter
-//                .userDetailsService(jdbcUserDetailServiceImpl) // 读取验证用户的信息
-//                .tokenStore(redisTokenStore());
 
-//    }
+    private TokenGranter tokenGranter(final AuthorizationServerEndpointsConfigurer endpoints){
+        List<TokenGranter> granterList = new ArrayList<>(Collections.singletonList(endpoints.getTokenGranter()));
+        granterList.add(new SmsCodeTokenGranter(authenticationManager,endpoints.getTokenServices(),endpoints.getClientDetailsService(),endpoints.getOAuth2RequestFactory(),redisTemplate));
+        return new CompositeTokenGranter(granterList);
+    }
 
     @Bean
     public TokenStore redisTokenStore(){

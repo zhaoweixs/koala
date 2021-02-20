@@ -1,5 +1,6 @@
 package com.koala.uaa.config;
 
+import com.koala.uaa.sms.SmsCodeAuthenticationSecurityConfig;
 import net.bytebuddy.asm.Advice;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Bean;
@@ -30,15 +31,6 @@ public class WebSecurityConfig extends WebSecurityConfigurerAdapter {
         return new BCryptPasswordEncoder();
     }
 
-    @Autowired
-    private UserDetailsService jdbcUserDetailServiceImpl;
-
-
-    @Override
-    protected void configure(AuthenticationManagerBuilder auth) throws Exception {
-        auth.userDetailsService(jdbcUserDetailServiceImpl).passwordEncoder(passwordEncoder());
-    }
-
     /**
      * 用于启用密码模式 否则密码模式无法使用
      * @return
@@ -50,6 +42,18 @@ public class WebSecurityConfig extends WebSecurityConfigurerAdapter {
         return super.authenticationManagerBean();
     }
 
+    @Autowired
+    private SmsCodeAuthenticationSecurityConfig smsCodeAuthenticationSecurityConfig;
+
+    @Autowired
+    private UserDetailsService jdbcUserDetailServiceImpl;
+
+
+    @Override
+    protected void configure(AuthenticationManagerBuilder auth) throws Exception {
+        auth.userDetailsService(jdbcUserDetailServiceImpl).passwordEncoder(passwordEncoder());
+    }
+
 //    @Override
 //    public void configure(WebSecurity web) throws Exception {
 //        super.configure(web);
@@ -59,20 +63,17 @@ public class WebSecurityConfig extends WebSecurityConfigurerAdapter {
     protected void configure(HttpSecurity http) throws Exception {
         http.requestMatchers().anyRequest()
                 .and()
+                .csrf().disable()
                 .formLogin()
                 .and()
+                .apply(smsCodeAuthenticationSecurityConfig)
+                .and()
                 .authorizeRequests()
-                .antMatchers("/auth/**").permitAll()
+                .antMatchers("/auth/**","/login").permitAll()
                 .antMatchers("/oauth/token").permitAll()
-                .antMatchers("/login/*").permitAll()
+                .antMatchers("/oauth/mobile").permitAll()
+                .antMatchers("/login").permitAll()
                 .antMatchers("/actuator/**").permitAll()
                 .antMatchers("/test/**").authenticated();
-//        http
-//                .authorizeRequests()
-//                .antMatchers("/**").authenticated()
-//                .antMatchers("/test/hello").permitAll()
-//                .antMatchers("/test/**").authenticated()
-//                .and()
-//                .userDetailsService(jdbcUserDetailServiceImpl);
     }
 }
